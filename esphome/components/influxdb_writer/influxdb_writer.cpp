@@ -1,5 +1,7 @@
 #include "influxdb_writer.h"
 #include "esphome/core/log.h"
+#include "esphome/core/application.h"
+
 
 namespace esphome {
 namespace influxdb_writer {
@@ -8,50 +10,49 @@ static const char *const TAG = "influxdb_writer";
 
 void InfluxDBWriter::setup() {
   ESP_LOGI(TAG, "Setting up InfluxDBWriter");
-}
 
-void InfluxDBWriter::loop() {
-/*
-  static unsigned long last_sent = 0;
-  if (millis() - last_sent > 60000 && http_request_ != nullptr) {
-    std::string line = "measurement,dispositivo=esp32 valor=42.0";
+  for (auto *sensor : App.get_sensors()) {
+    if (sensor != nullptr){
+      ESP_LOGD(TAG, "Sensor name: %s, last value: %f", sensor->get_name().c_str(), sensor->state);
+      this->sensors_.push_back(sensor);
 
-    std::string url = "http://" + host_ + ":8086/api/v2/write?bucket=" + bucket_ + "&org=" + org_ + "&precision=s";
-
-    std::map<std::string, std::string> headers;
-    headers["Authorization"] = "Token " + token_;
-    headers["Content-Type"] = "text/plain";
-
-    ESP_LOGI(TAG, "POST a InfluxDB v2 -> %s", url.c_str());
-    http_request_->post(
-      url,
-      line,
-      headers
-      );
-
-    last_sent = millis();
-  }
-  */
-    static unsigned long last_sent = 0;
-    if (millis() - last_sent > 60000 && http_request_ != nullptr) { {
-        // Construye la URL para InfluxDB
-        std::string url = "http://" + this->host_ + ":8086/api/v2/write?org=Noone&bucket=TestBucket&precision=s";
-
-        // El cuerpo de la solicitud (datos para InfluxDB)
-        std::string body = "temperature,device=esp32,city=Sunchales value=15";
-
-        // Crear encabezados para la solicitud (si es necesario)
-        std::list<http_request::Header> headers;
-        headers.push_back({"Content-Type", "text/plain;charset=utf-8"});  // Ajusta según el tipo necesario
-        headers.push_back({"Authorization", "Token TeleAuUi9M9hiQXCouzLvRIUFEW6PqHraoba51ivt7ux0Ve11QMk7ti9nlJafkOmZiUhzH_Jl484xhAJN1ExYw=="});
-        // Llamar al método `post` con la URL, el cuerpo y los encabezados
-        auto container = this->http_request_->post(url, body, headers);
-
-        // Puedes agregar código para manejar la respuesta (si lo deseas)
-        // Ejemplo: container->on_response([](int status, const std::string &response) {...});
     }
-    last_sent = millis();
+  }
+  ESP_LOGI(TAG, "Amount of sensors detected: %d", this->sensors_.size());
 }
+
+void InfluxDBWriter::update() {
+  static unsigned long last_sent = 0;
+
+  // Influxdb url
+  std::string url = "http://"+this->host_ +":"+this->port_+"/api/v2/write?org="+this->org_ +"&bucket="+this->bucket_+"&precision="+this->precision_;
+
+  // Http body
+  std::string body;
+
+  for (auto *sensor : this->sensors_) {
+
+    float value = sensor->state;
+
+    // Skip if value is NAN
+    if (isnan(value)) continue;
+
+    std::string name = sensor->get_name();
+    // Body using line protocol
+    body += name + ",device=esp32 value=" + to_string(value) + "\n";
+
+  }
+
+  ESP_LOGD(TAG, "HTTP Body: %s", body.c_str());
+
+  // Http headers
+  std::list<http_request::Header> headers;
+  headers.push_back({"Content-Type", "text/plain;charset=utf-8"});  
+  headers.push_back({"Authorization", "Token "+this->token_}); 
+
+  // Http POST
+  auto container = this->http_request_->post(url, body, headers);
+
 }
 
 }  // namespace influxdb_writer

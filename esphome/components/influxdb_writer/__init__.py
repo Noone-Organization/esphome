@@ -2,13 +2,16 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 from esphome.components import http_request
-
+from esphome.components import sensor
 
 CONF_HOST = "host"
 CONF_TOKEN = "token"
 CONF_BUCKET = "bucket"
 CONF_ORG = "org"
 CONF_HTTP_REQUEST_ID = "http_request_id"
+CONF_PORT = "port"
+CONF_PRECISION = "precision"
+CONF_SENSOR_TAGS = "sensor_tags"
 
 influxdb_writer_ns = cg.esphome_ns.namespace("influxdb_writer")
 InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.Component)
@@ -20,17 +23,27 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_TOKEN): cv.string,
     cv.Required(CONF_BUCKET): cv.string,
     cv.Required(CONF_ORG): cv.string,
-}).extend(cv.COMPONENT_SCHEMA)
+    cv.Required(CONF_PORT): cv.string,
+    cv.Optional(CONF_PRECISION, default="s"): cv.one_of("s", "ms", lower=True),
+}).extend(cv.polling_component_schema("5min"))
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
     request = await cg.get_variable(config[CONF_HTTP_REQUEST_ID])
     cg.add(var.set_host(config[CONF_HOST]))
     cg.add(var.set_token(config[CONF_TOKEN]))
     cg.add(var.set_bucket(config[CONF_BUCKET]))
     cg.add(var.set_org(config[CONF_ORG]))
     cg.add(var.set_http_request(request))
+    cg.add(var.set_port(config[CONF_PORT]))
+    cg.add(var.set_precision(config[CONF_PRECISION]))
+
+
+
+
+
     
     
 
