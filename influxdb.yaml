@@ -8,6 +8,7 @@ esp32:
 
 # Enable logging
 logger:
+  level: DEBUG
 
 # Enable Home Assistant API
 api:
@@ -19,7 +20,7 @@ ota:
 
 wifi:
   ssid: "Cipolatti"
-  password: "XXXXXX"
+  password: "38136350"
   manual_ip:
     static_ip: 192.168.1.50
     gateway: 192.168.1.1
@@ -32,32 +33,34 @@ wifi:
 
 captive_portal:
 
-#http_request:
-#  id: http_client
-#  useragent: esphome/device
-#  verify_ssl: false
-
-#interval:
-#  - interval: 600s
-#    then:
-#      - http_request.post:
-#          id: http_client
-#          url: http://192.168.1.14:8086/api/v2/write?org=Noone&bucket=TestBucket&precision=s
-#          headers: 
-#            Authorization: "Token TeleAuUi9M9hiQXCouzLvRIUFEW6PqHraoba51ivt7ux0Ve11QMk7ti9nlJafkOmZiUhzH_Jl484xhAJN1ExYw=="       
-#            Content-Type: "text/plain; charset=utf-8"
-#          body: "temperature,sensor=bathroom,device=DesktopPC,city=Sunchales value=100"
+sensor:
+  - platform: dht
+    model: DHT11
+    pin: GPIO4
+    temperature:
+      name: "temperature"
+    humidity:
+      name: "humidity"
+    update_interval: 20s
 
 http_request:
   id: http_client
   verify_ssl: false
-
+  
 influxdb_writer:
   id: writer
   host: "192.168.1.14"
+  port: "8086"
   token: "TeleAuUi9M9hiQXCouzLvRIUFEW6PqHraoba51ivt7ux0Ve11QMk7ti9nlJafkOmZiUhzH_Jl484xhAJN1ExYw=="
   bucket: "TestBucket"
   org: "Noone"
+  precision: "s"
   http_request_id: http_client
+  update_interval: 60s
+  sensor_tags:
+    temperature: 
+      room: "Living"
+      city: "Sunchales"
+    humidity:
+      room: "Kitchen"
 
-    

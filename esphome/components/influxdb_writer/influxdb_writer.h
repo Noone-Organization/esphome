@@ -20,6 +20,7 @@ class InfluxDBWriter : public PollingComponent {
       void set_port(const std::string &port) { port_ = port; }
       void set_precision(const std::string &precision) { precision_ = precision; }
       void set_http_request(http_request::HttpRequestComponent *request) { http_request_ = request; }
+      void add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value);
 
    protected:
       std::string host_;
@@ -28,6 +29,9 @@ class InfluxDBWriter : public PollingComponent {
       std::string org_;
       std::string port_;
       std::string precision_;
+
+      std::map<std::string, std::map<std::string, std::string>> tags_;
+
       std::vector<esphome::sensor::Sensor *> sensors_;
       http_request::HttpRequestComponent *http_request_{nullptr};
 };

@@ -11,7 +11,7 @@ CONF_ORG = "org"
 CONF_HTTP_REQUEST_ID = "http_request_id"
 CONF_PORT = "port"
 CONF_PRECISION = "precision"
-CONF_SENSOR_TAGS = "sensor_tags"
+CONF_TAGS = "sensor_tags"
 
 influxdb_writer_ns = cg.esphome_ns.namespace("influxdb_writer")
 InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.Component)
@@ -25,6 +25,11 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_ORG): cv.string,
     cv.Required(CONF_PORT): cv.string,
     cv.Optional(CONF_PRECISION, default="s"): cv.one_of("s", "ms", lower=True),
+    cv.Optional(CONF_TAGS, default={}): cv.Schema({
+        cv.string: cv.Schema({
+            cv.string: cv.string
+        })
+    }),
 }).extend(cv.polling_component_schema("5min"))
 
 async def to_code(config):
@@ -39,6 +44,11 @@ async def to_code(config):
     cg.add(var.set_http_request(request))
     cg.add(var.set_port(config[CONF_PORT]))
     cg.add(var.set_precision(config[CONF_PRECISION]))
+    if CONF_TAGS in config:
+        for sensor_name, tags in config[CONF_TAGS].items():
+            for tag_key, tag_value in tags.items():
+                cg.add(var.add_sensor_tag(sensor_name, tag_key, tag_value))
+
 
 
 
