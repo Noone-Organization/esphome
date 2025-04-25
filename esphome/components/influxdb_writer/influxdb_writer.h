@@ -29,6 +29,7 @@ class InfluxDBWriter : public PollingComponent {
       void set_http_request(http_request::HttpRequestComponent *request) { http_request_ = request; }
       void add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value);
       void set_time(esphome::sntp::SNTPComponent *time) { this->time_ = time; }
+      void set_field_name(const std::string &sensor, const std::string &fieldName);
 
    protected:
       std::string host_;
@@ -39,9 +40,8 @@ class InfluxDBWriter : public PollingComponent {
       std::string timestampUnit_;
       std::string url_;
       
-      //void getTimestamp();
       std::map<std::string, std::map<std::string, std::string>> tags_;
-
+      std::map<std::string, std::string> fieldNames_;
       esphome::sntp::SNTPComponent *time_{nullptr};
       std::vector<esphome::sensor::Sensor *> sensors_; 
       http_request::HttpRequestComponent *http_request_{nullptr};

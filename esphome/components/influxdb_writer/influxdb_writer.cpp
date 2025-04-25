@@ -2,7 +2,6 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
-
 namespace esphome {
 namespace influxdb_writer {
 
@@ -34,12 +33,16 @@ void InfluxDBWriter::update() {
   std::string line;
   // Http body. This will have all the lines (all the measurements)
   std::string body;
+  std::string field;
 
   // If sntp time is sinchronized, get one timestamp for the measurements
   if (this->time_ != nullptr) {
       timestamp = this->time_->now().timestamp;
-      has_time = true;
-      ESP_LOGD(TAG, "Got timestamp: %ld", timestamp);
+      // In case of the clock is not sinchronized yet
+      if (timestamp > 1000000000) {
+        has_time = true;
+        ESP_LOGD(TAG, "Got timestamp: %ld", timestamp);
+      }
   }
   else{
     has_time = false;
@@ -65,8 +68,17 @@ void InfluxDBWriter::update() {
         line += "," + tag_pair.first + "=" + tag_pair.second;
       }
     }
-    // Adds the measurement value 
-    line += " value=" + to_string(value);
+
+    auto field_name = this->fieldNames_.find(name);
+    if (field_name != this->fieldNames_.end()){
+      field = field_name->second;
+    }
+    else {
+      field = "value";
+    }
+
+    // Adds the measurement value and the field name if a custom one is available
+    line += " " + field + "=" + to_string(value);
 
     if (has_time == true) {
       // Adds the timestamp at the end of the request
@@ -93,8 +105,11 @@ void InfluxDBWriter::update() {
 }
 
 void InfluxDBWriter::add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value) {
-    ESP_LOGD(TAG, "Tag added: sensor=%s, %s=%s", sensor.c_str(), tag.c_str(), value.c_str());
-    this->tags_[sensor][tag] = value;
+  this->tags_[sensor][tag] = value;
+}
+
+void InfluxDBWriter::set_field_name(const std::string &sensor, const std::string &name) {
+  this->fieldNames_[sensor] = name;
 }
 
 void InfluxDBWriter::dump_config(){

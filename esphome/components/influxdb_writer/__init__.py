@@ -16,6 +16,7 @@ CONF_TIME_ID = "time_id"
 CONF_PORT = "port"
 CONF_TIMESTAMP_UNIT = "timestamp_unit"
 CONF_TAGS = "sensor_tags"
+CONF_FIELD_NAME = "field_names"
 
 influxdb_writer_ns = cg.esphome_ns.namespace("influxdb_writer")
 InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.PollingComponent)
@@ -30,6 +31,9 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_ORG): cv.string,
     cv.Required(CONF_PORT): cv.string,
     cv.Optional(CONF_TIMESTAMP_UNIT, default="s"): cv.one_of("s", "ms", lower=True),
+    cv.Optional(CONF_FIELD_NAME, default={}): cv.Schema({
+        cv.string: cv.string
+    }),
     cv.Optional(CONF_TAGS, default={}): cv.Schema({
         cv.string: cv.Schema({
             cv.string: cv.string
@@ -55,6 +59,9 @@ async def to_code(config):
         for sensor_name, tags in config[CONF_TAGS].items():
             for tag_key, tag_value in tags.items():
                 cg.add(var.add_sensor_tag(sensor_name, tag_key, tag_value))
+    if CONF_FIELD_NAME in config:
+        for sensor_name, field_name in config[CONF_FIELD_NAME].items():
+            cg.add(var.set_field_name(sensor_name, field_name))
 
 
 
