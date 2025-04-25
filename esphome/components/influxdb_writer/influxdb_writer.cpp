@@ -14,6 +14,7 @@ void InfluxDBWriter::setup() {
   // Influxdb url
   this->url_ = "http://"+this->host_ +":"+this->port_+"/api/v2/write?org="+this->org_ +"&bucket="+this->bucket_+"&precision="+this->timestampUnit_;
 
+  // Get all the sensor connected
   for (auto *sensor : App.get_sensors()) {
     if (sensor != nullptr){
       ESP_LOGD(TAG, "Sensor name: %s, last value: %f", sensor->get_name().c_str(), sensor->state);
@@ -26,11 +27,23 @@ void InfluxDBWriter::setup() {
 
 void InfluxDBWriter::update() {
   static unsigned long last_sent = 0;
+  time_t timestamp = 0;
+  bool has_time = false;
 
   // Variable to save individual measurements
   std::string line;
   // Http body. This will have all the lines (all the measurements)
   std::string body;
+
+  // If sntp time is sinchronized, get one timestamp for the measurements
+  if (this->time_ != nullptr) {
+      timestamp = this->time_->now().timestamp;
+      has_time = true;
+      ESP_LOGD(TAG, "Got timestamp: %ld", timestamp);
+  }
+  else{
+    has_time = false;
+  }
 
   // Go through all sensors detected
   for (auto *sensor : this->sensors_) {
@@ -44,7 +57,7 @@ void InfluxDBWriter::update() {
 
     // Start the measure with the name of the measure
     line = name;
-    // If tags exist for this sensor, add the key and the name of the 
+    // If tags exist for this sensor, add the key and the name of the configured tag
     auto tag_begin = this->tags_.find(name);
     if(tag_begin != this->tags_.end()){
       const auto& sensor_tags = tag_begin->second;
@@ -52,12 +65,10 @@ void InfluxDBWriter::update() {
         line += "," + tag_pair.first + "=" + tag_pair.second;
       }
     }
+    // Adds the measurement value 
     line += " value=" + to_string(value);
 
-    // If clock have been sinchronized, get the timestamp
-    if (this->time_ != nullptr) {
-      time_t timestamp = this->time_->now().timestamp;
-      ESP_LOGD(TAG, "Got timestamp: %ld", timestamp);
+    if (has_time == true) {
       // Adds the timestamp at the end of the request
       line += " " + to_string(timestamp) + "\n";
     }
@@ -76,9 +87,8 @@ void InfluxDBWriter::update() {
   headers.push_back({"Content-Type", "text/plain;charset=utf-8"});  
   headers.push_back({"Authorization", "Token "+this->token_}); 
 
-  // Http POST
+  // Http POST request
   auto return_code = this->http_request_->post(this->url_, body, headers);
-
 
 }
 
@@ -88,7 +98,11 @@ void InfluxDBWriter::add_sensor_tag(const std::string &sensor, const std::string
 }
 
 void InfluxDBWriter::dump_config(){
-
+  ESP_LOGCONFIG(TAG, "Host: %s", this->url_.c_str());
+  ESP_LOGCONFIG(TAG, "Port: %s", this->port_.c_str());
+  ESP_LOGCONFIG(TAG, "Organization: %s", this->org_.c_str());
+  ESP_LOGCONFIG(TAG, "Bucket: %s", this->bucket_.c_str());
+  ESP_LOGCONFIG(TAG, "Update interval: %ds", this->update_interval_/1000);
 }
 
 }  // namespace influxdb_writer
