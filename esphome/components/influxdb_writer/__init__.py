@@ -1,30 +1,35 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ID
 from esphome.components import http_request
-from esphome.components import sensor
+from esphome.components import sntp 
+from esphome.const import CONF_ID
+
+CODEOWNERS = ["@IgnacioCipo"]
+DEPENDENCIES = ["http_request", "time"]
 
 CONF_HOST = "host"
 CONF_TOKEN = "token"
 CONF_BUCKET = "bucket"
 CONF_ORG = "org"
 CONF_HTTP_REQUEST_ID = "http_request_id"
+CONF_TIME_ID = "time_id"
 CONF_PORT = "port"
-CONF_PRECISION = "precision"
+CONF_TIMESTAMP_UNIT = "timestamp_unit"
 CONF_TAGS = "sensor_tags"
 
 influxdb_writer_ns = cg.esphome_ns.namespace("influxdb_writer")
-InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.Component)
+InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.PollingComponent)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(InfluxDBWriter),
     cv.Required(CONF_HTTP_REQUEST_ID): cv.use_id(http_request.HttpRequestComponent),
+    cv.Required(CONF_TIME_ID): cv.use_id(sntp),
     cv.Required(CONF_HOST): cv.string,
     cv.Required(CONF_TOKEN): cv.string,
     cv.Required(CONF_BUCKET): cv.string,
     cv.Required(CONF_ORG): cv.string,
     cv.Required(CONF_PORT): cv.string,
-    cv.Optional(CONF_PRECISION, default="s"): cv.one_of("s", "ms", lower=True),
+    cv.Optional(CONF_TIMESTAMP_UNIT, default="s"): cv.one_of("s", "ms", lower=True),
     cv.Optional(CONF_TAGS, default={}): cv.Schema({
         cv.string: cv.Schema({
             cv.string: cv.string
@@ -37,13 +42,15 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     request = await cg.get_variable(config[CONF_HTTP_REQUEST_ID])
+    time_ = await cg.get_variable(config[CONF_TIME_ID])
+    cg.add(var.set_time(time_))
     cg.add(var.set_host(config[CONF_HOST]))
     cg.add(var.set_token(config[CONF_TOKEN]))
     cg.add(var.set_bucket(config[CONF_BUCKET]))
     cg.add(var.set_org(config[CONF_ORG]))
     cg.add(var.set_http_request(request))
     cg.add(var.set_port(config[CONF_PORT]))
-    cg.add(var.set_precision(config[CONF_PRECISION]))
+    cg.add(var.set_influxdb_timestamp_unit(config[CONF_TIMESTAMP_UNIT]))
     if CONF_TAGS in config:
         for sensor_name, tags in config[CONF_TAGS].items():
             for tag_key, tag_value in tags.items():
