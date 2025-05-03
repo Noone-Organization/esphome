@@ -6,9 +6,10 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/http_request/http_request.h"
 #include "esphome/components/sntp/sntp_component.h"
-
 
 namespace esphome {
 namespace influxdb_writer {
@@ -42,8 +43,13 @@ class InfluxDBWriter : public PollingComponent {
       
       std::map<std::string, std::map<std::string, std::string>> tags_;
       std::map<std::string, std::string> fieldNames_;
+      std::map<std::string, bool> binarySensorsStates_;
+
       esphome::sntp::SNTPComponent *time_{nullptr};
+
       std::vector<esphome::sensor::Sensor *> sensors_; 
+      std::vector<esphome::text_sensor::TextSensor *> textSensors_; 
+
       http_request::HttpRequestComponent *http_request_{nullptr};
 };
 

@@ -13,15 +13,30 @@ void InfluxDBWriter::setup() {
   // Influxdb url
   this->url_ = "http://"+this->host_ +":"+this->port_+"/api/v2/write?org="+this->org_ +"&bucket="+this->bucket_+"&precision="+this->timestampUnit_;
 
-  // Get all the sensor connected
+  // Get all the floating sensors connected
   for (auto *sensor : App.get_sensors()) {
     if (sensor != nullptr){
-      ESP_LOGD(TAG, "Sensor name: %s, last value: %f", sensor->get_name().c_str(), sensor->state);
       this->sensors_.push_back(sensor);
     }
   }
-  ESP_LOGI(TAG, "Amount of sensors detected: %d", this->sensors_.size());
+  // Get all binary sensors connected
+  for (auto *binary_sensor : App.get_binary_sensors()) {
+    if (binary_sensor != nullptr){    
+      // Set initial value for binary sensors
+      this->binarySensorsStates_[binary_sensor->get_name()] = binary_sensor->state;
 
+      // Callback for binary sensor changes of state
+      binary_sensor->add_on_state_callback([this, binary_sensor](bool state) {
+        this->binarySensorsStates_[binary_sensor->get_name()] = state;
+      });
+    }
+  }
+  // Get all text sensors connected
+  for (auto *text_sensor : App.get_text_sensors()) {
+    if (text_sensor != nullptr){
+      this->textSensors_.push_back(text_sensor);
+    }
+  }
 }
 
 void InfluxDBWriter::update() {
@@ -48,7 +63,7 @@ void InfluxDBWriter::update() {
     has_time = false;
   }
 
-  // Go through all sensors detected
+  // Floating sensors
   for (auto *sensor : this->sensors_) {
 
     float value = sensor->state;
@@ -69,13 +84,9 @@ void InfluxDBWriter::update() {
       }
     }
 
+    // Checks if the sensor has a custom field name assigned
     auto field_name = this->fieldNames_.find(name);
-    if (field_name != this->fieldNames_.end()){
-      field = field_name->second;
-    }
-    else {
-      field = "value";
-    }
+    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
 
     // Adds the measurement value and the field name if a custom one is available
     line += " " + field + "=" + to_string(value);
@@ -92,11 +103,40 @@ void InfluxDBWriter::update() {
     body += line;
   }
 
+  // Binary sensors
+  for (const auto& pair : this->binarySensorsStates_) {
+    const std::string& name = pair.first;
+    bool state = pair.second;
+
+    line = name;
+
+    auto tag_begin = this->tags_.find(name);
+    if (tag_begin != this->tags_.end()) {
+      const auto& sensor_tags = tag_begin->second;
+      for (const auto& tag_pair : sensor_tags) {
+        line += "," + tag_pair.first + "=" + tag_pair.second;
+      }
+    }
+
+    auto field_name = this->fieldNames_.find(name);
+    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+
+    line += " " + field + "=" + std::to_string(state ? 1 : 0);
+    if (has_time) {
+      line += " " + std::to_string(timestamp) + "\n";
+    } else {
+      line += "\n";
+    }
+
+    body += line;
+  }
+
   ESP_LOGD(TAG, "HTTP Request Body: %s", body.c_str());
 
   // Http headers
   std::list<http_request::Header> headers;
-  headers.push_back({"Content-Type", "text/plain;charset=utf-8"});  
+  headers.push_back({"Content-Type", "text/plain;charset=utf-8"}); 
+  // Authorization with API Token 
   headers.push_back({"Authorization", "Token "+this->token_}); 
 
   // Http POST request
@@ -104,10 +144,12 @@ void InfluxDBWriter::update() {
 
 }
 
+// Method to save tags defined for each sensor in the yaml
 void InfluxDBWriter::add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value) {
   this->tags_[sensor][tag] = value;
 }
 
+// Method to save custom field names for each sensor in the yaml
 void InfluxDBWriter::set_field_name(const std::string &sensor, const std::string &name) {
   this->fieldNames_[sensor] = name;
 }

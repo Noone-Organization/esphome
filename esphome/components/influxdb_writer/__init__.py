@@ -5,7 +5,7 @@ from esphome.components import sntp
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@IgnacioCipo"]
-DEPENDENCIES = ["http_request", "time"]
+DEPENDENCIES = ["http_request", "time", "binary_sensor", "text_sensor"]
 
 CONF_HOST = "host"
 CONF_TOKEN = "token"
