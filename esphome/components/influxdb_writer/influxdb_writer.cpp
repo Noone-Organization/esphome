@@ -10,8 +10,11 @@ static const char *const TAG = "influxdb_writer";
 void InfluxDBWriter::setup() {
   ESP_LOGI(TAG, "Setting up InfluxDBWriter");
 
+  if (this->use_ssl) this->url_ = "https://";
+  else this->url_ = "http://";
+
   // Influxdb url
-  this->url_ = "http://"+this->host_ +":"+this->port_+"/api/v2/write?org="+this->org_ +"&bucket="+this->bucket_+"&precision="+this->timestampUnit_;
+  this->url_ += this->host_ +":"+this->port_+"/api/v2/write?org="+this->org_ +"&bucket="+this->bucket_+"&precision="+this->timestampUnit_;
 
   // Get all the floating sensors connected
   for (auto *sensor : App.get_sensors()) {

@@ -31,6 +31,7 @@ class InfluxDBWriter : public PollingComponent {
       void add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value);
       void set_time(esphome::sntp::SNTPComponent *time) { this->time_ = time; }
       void set_field_name(const std::string &sensor, const std::string &fieldName);
+      void set_use_ssl(bool use_ssl) { this->use_ssl = use_ssl; }
 
    protected:
       std::string host_;
@@ -40,6 +41,7 @@ class InfluxDBWriter : public PollingComponent {
       std::string port_;
       std::string timestampUnit_;
       std::string url_;
+      bool use_ssl;
       
       std::map<std::string, std::map<std::string, std::string>> tags_;
       std::map<std::string, std::string> fieldNames_;
