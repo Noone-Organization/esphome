@@ -44,6 +44,9 @@ class InfluxDBWriter : public PollingComponent {
       std::string url_;
       bool use_ssl;
 
+      std::string build_tags(const std::string& id);
+      std::string get_field_name(const std::string& id);
+
       std::list<esphome::http_request::Header> headers_;
       
       std::map<std::string, std::string> sensorNamesWithId_;

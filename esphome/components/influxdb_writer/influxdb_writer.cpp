@@ -22,18 +22,18 @@ void InfluxDBWriter::setup() {
       this->sensors_.push_back(sensor);
     }
   }
-  // Get all binary sensors connected
+  //Get all binary sensors connected
   for (auto *binary_sensor : App.get_binary_sensors()) {
     if (binary_sensor != nullptr){    
       // Set initial value for binary sensors
       this->binarySensorsStates_[binary_sensor->get_name()] = binary_sensor->state;
-
       // Callback for binary sensor changes of state
       binary_sensor->add_on_state_callback([this, binary_sensor](bool state) {
         this->binarySensorsStates_[binary_sensor->get_name()] = state;
       });
     }
   }
+
   // Get all text sensors connected
   for (auto *text_sensor : App.get_text_sensors()) {
     if (text_sensor != nullptr){
@@ -58,6 +58,7 @@ void InfluxDBWriter::update() {
   std::string body;
   std::string id;
   std::string field;
+  std::string sensor_tags;
 
   // If sntp time is sinchronized, get one timestamp for the measurements
   if (this->time_ != nullptr) {
@@ -95,18 +96,12 @@ void InfluxDBWriter::update() {
 
     // Start the line protocol with the id of the sensor
     line = id;
-    // If tags exist for this sensor, add the key and the name of the configured tag
-    auto tag_begin = this->tags_.find(id);
-    if(tag_begin != this->tags_.end()){
-      const auto& sensor_tags = tag_begin->second;
-      for (const auto& tag_pair : sensor_tags) {
-        line += "," + tag_pair.first + "=" + tag_pair.second;
-      }
-    }
+
+    sensor_tags = this->build_tags(id);
+    line += sensor_tags;
 
     // Checks if the sensor has a custom field name assigned
-    auto field_name = this->fieldNames_.find(id);
-    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+    field = this->get_field_name(id);
 
     // Adds the measurement value and the field name if a custom one is available
     line += " " + field + "=" + to_string(value);
@@ -124,10 +119,10 @@ void InfluxDBWriter::update() {
   }
 
   // Binary sensors
-  for (const auto& pair : this->binarySensorsStates_) {
+  for (const auto& binary_sens : this->binarySensorsStates_) {
     
-    const std::string& name = pair.first;
-    bool state = pair.second;
+    const std::string& name = binary_sens.first;
+    bool state = binary_sens.second;
 
     // Finds id using the name of the binary sensor
     auto it = this->sensorNamesWithId_.find(name);
@@ -140,17 +135,13 @@ void InfluxDBWriter::update() {
     
     line = id;
 
-    auto tag_begin = this->tags_.find(id);
-    if (tag_begin != this->tags_.end()) {
-      const auto& sensor_tags = tag_begin->second;
-      for (const auto& tag_pair : sensor_tags) {
-        line += "," + tag_pair.first + "=" + tag_pair.second;
-      }
-    }
+    // Get all the tags configured per sensor
+    sensor_tags = this->build_tags(id);
+    line += sensor_tags;
 
-    auto field_name = this->fieldNames_.find(id);
-    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+    field = this->get_field_name(id);
 
+    //bool state = 
     line += " " + field + "=" + std::to_string(state ? 1 : 0);
     if (has_time) {
       line += " " + std::to_string(timestamp) + "\n";
@@ -179,17 +170,12 @@ void InfluxDBWriter::update() {
 
     line = id;
 
-    auto tag_begin = this->tags_.find(id);
-    if (tag_begin != this->tags_.end()) {
-      const auto& sensor_tags = tag_begin->second;
-      for (const auto& tag_pair : sensor_tags) {
-        line += "," + tag_pair.first + "=" + tag_pair.second;
-      }
-    }
+    // Get all the tags configured per sensor
+    sensor_tags = this->build_tags(id);
+    line += sensor_tags;
 
     // Checks if the sensor has a custom field name assigned
-    auto field_name = this->fieldNames_.find(id);
-    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+    field = this->get_field_name(id);
 
     // Adds the measurement value and the field name if a custom one is available
     line += " " + field + "=\"" + value + "\"";
@@ -226,6 +212,24 @@ void InfluxDBWriter::set_field_name(const std::string &sensor, const std::string
 // Method to save sensors ids and its names
 void InfluxDBWriter::add_sensor_name_id(const std::string &sensor_id, const std::string &name) {
   this->sensorNamesWithId_[name] = sensor_id;
+}
+
+// Returns all configured tags per sensor
+std::string InfluxDBWriter::build_tags(const std::string& id) {
+  std::string tags;
+    auto tag_it = this->tags_.find(id);
+    if (tag_it != this->tags_.end()) {
+      for (const auto& pair : tag_it->second) {
+        tags += "," + pair.first + "=" + pair.second;
+      }
+    }
+    return tags;
+}
+
+// Return field name if it was configured, default is "value"
+std::string InfluxDBWriter::get_field_name(const std::string& id) {
+  auto field_name = this->fieldNames_.find(id);
+  return (field_name != this->fieldNames_.end()) ? field_name->second : "value";
 }
 
 void InfluxDBWriter::dump_config(){
