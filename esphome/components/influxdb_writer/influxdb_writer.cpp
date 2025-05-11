@@ -40,6 +40,11 @@ void InfluxDBWriter::setup() {
       this->textSensors_.push_back(text_sensor);
     }
   }
+
+  // Set Http headers
+  this->headers_.push_back({"Content-Type", "text/plain;charset=utf-8"}); 
+  // Authorization with API Token for InfluxDB v2
+  this->headers_.push_back({"Authorization", "Token "+this->token_}); 
 }
 
 void InfluxDBWriter::update() {
@@ -51,6 +56,7 @@ void InfluxDBWriter::update() {
   std::string line;
   // Http body. This will have all the lines (all the measurements)
   std::string body;
+  std::string id;
   std::string field;
 
   // If sntp time is sinchronized, get one timestamp for the measurements
@@ -69,17 +75,28 @@ void InfluxDBWriter::update() {
   // Floating sensors
   for (auto *sensor : this->sensors_) {
 
+    // Gets the float value of the sensor
     float value = sensor->state;
 
     // Skip if value is NAN
     if (isnan(value)) continue;
 
+    // Gets the name of the sensor
     std::string name = sensor->get_name();
 
-    // Start the measure with the name of the measure
-    line = name;
+    // Finds the id of the sensor using the name
+    auto it = this->sensorNamesWithId_.find(name);
+    if (it != this->sensorNamesWithId_.end()) {
+      id = it->second;  
+    }
+    else {
+      continue;
+    }
+
+    // Start the line protocol with the id of the sensor
+    line = id;
     // If tags exist for this sensor, add the key and the name of the configured tag
-    auto tag_begin = this->tags_.find(name);
+    auto tag_begin = this->tags_.find(id);
     if(tag_begin != this->tags_.end()){
       const auto& sensor_tags = tag_begin->second;
       for (const auto& tag_pair : sensor_tags) {
@@ -88,7 +105,7 @@ void InfluxDBWriter::update() {
     }
 
     // Checks if the sensor has a custom field name assigned
-    auto field_name = this->fieldNames_.find(name);
+    auto field_name = this->fieldNames_.find(id);
     field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
 
     // Adds the measurement value and the field name if a custom one is available
@@ -108,12 +125,22 @@ void InfluxDBWriter::update() {
 
   // Binary sensors
   for (const auto& pair : this->binarySensorsStates_) {
+    
     const std::string& name = pair.first;
     bool state = pair.second;
 
-    line = name;
+    // Finds id using the name of the binary sensor
+    auto it = this->sensorNamesWithId_.find(name);
+    if (it != this->sensorNamesWithId_.end()) {
+      id = it->second;  
+    }
+    else {
+      continue;
+    }
+    
+    line = id;
 
-    auto tag_begin = this->tags_.find(name);
+    auto tag_begin = this->tags_.find(id);
     if (tag_begin != this->tags_.end()) {
       const auto& sensor_tags = tag_begin->second;
       for (const auto& tag_pair : sensor_tags) {
@@ -121,7 +148,7 @@ void InfluxDBWriter::update() {
       }
     }
 
-    auto field_name = this->fieldNames_.find(name);
+    auto field_name = this->fieldNames_.find(id);
     field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
 
     line += " " + field + "=" + std::to_string(state ? 1 : 0);
@@ -134,16 +161,55 @@ void InfluxDBWriter::update() {
     body += line;
   }
 
+  // Text sensors
+  for (auto text_sensor : this->textSensors_) {
+    std::string value = text_sensor->state;
+
+    // Gets the name of the sensor
+    std::string name = text_sensor->get_name();
+
+    // Finds the id of the sensor using the name
+    auto it = this->sensorNamesWithId_.find(name);
+    if (it != this->sensorNamesWithId_.end()) {
+      id = it->second;  
+    }
+    else {
+      continue;
+    }
+
+    line = id;
+
+    auto tag_begin = this->tags_.find(id);
+    if (tag_begin != this->tags_.end()) {
+      const auto& sensor_tags = tag_begin->second;
+      for (const auto& tag_pair : sensor_tags) {
+        line += "," + tag_pair.first + "=" + tag_pair.second;
+      }
+    }
+
+    // Checks if the sensor has a custom field name assigned
+    auto field_name = this->fieldNames_.find(id);
+    field = (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+
+    // Adds the measurement value and the field name if a custom one is available
+    line += " " + field + "=\"" + value + "\"";
+
+    if (has_time == true) {
+      // Adds the timestamp at the end of the line
+      line += " " + to_string(timestamp) + "\n";
+    }
+    // If not, don't send timestamp
+    else{
+      line += "\n";
+    }
+    // Add measurement to the final body
+    body += line;
+  }
+
   ESP_LOGD(TAG, "HTTP Request Body: %s", body.c_str());
 
-  // Http headers
-  std::list<http_request::Header> headers;
-  headers.push_back({"Content-Type", "text/plain;charset=utf-8"}); 
-  // Authorization with API Token 
-  headers.push_back({"Authorization", "Token "+this->token_}); 
-
   // Http POST request
-  auto return_code = this->http_request_->post(this->url_, body, headers);
+  auto return_code = this->http_request_->post(this->url_, body, this->headers_);
 
 }
 
@@ -155,6 +221,11 @@ void InfluxDBWriter::add_sensor_tag(const std::string &sensor, const std::string
 // Method to save custom field names for each sensor in the yaml
 void InfluxDBWriter::set_field_name(const std::string &sensor, const std::string &name) {
   this->fieldNames_[sensor] = name;
+}
+
+// Method to save sensors ids and its names
+void InfluxDBWriter::add_sensor_name_id(const std::string &sensor_id, const std::string &name) {
+  this->sensorNamesWithId_[name] = sensor_id;
 }
 
 void InfluxDBWriter::dump_config(){
