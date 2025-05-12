@@ -49,8 +49,6 @@ void InfluxDBWriter::setup() {
 
 void InfluxDBWriter::update() {
   static unsigned long last_sent = 0;
-  time_t timestamp = 0;
-  bool has_time = false;
 
   // Variable to save individual measurements
   std::string line;
@@ -62,15 +60,15 @@ void InfluxDBWriter::update() {
 
   // If sntp time is sinchronized, get one timestamp for the measurements
   if (this->time_ != nullptr) {
-      timestamp = this->time_->now().timestamp;
+      this->timestamp = this->time_->now().timestamp;
       // In case of the clock is not sinchronized yet
-      if (timestamp > 1000000000) {
-        has_time = true;
-        ESP_LOGD(TAG, "Got timestamp: %ld", timestamp);
+      if (this->timestamp > 1000000000) {
+        this->has_time = true;
+        ESP_LOGD(TAG, "Got timestamp: %ld", this->timestamp);
       }
   }
   else{
-    has_time = false;
+    this->has_time = false;
   }
 
   // Floating sensors
@@ -94,26 +92,8 @@ void InfluxDBWriter::update() {
       continue;
     }
 
-    // Start the line protocol with the id of the sensor
-    line = id;
+    line = build_line(id, value);
 
-    sensor_tags = this->build_tags(id);
-    line += sensor_tags;
-
-    // Checks if the sensor has a custom field name assigned
-    field = this->get_field_name(id);
-
-    // Adds the measurement value and the field name if a custom one is available
-    line += " " + field + "=" + to_string(value);
-
-    if (has_time == true) {
-      // Adds the timestamp at the end of the request
-      line += " " + to_string(timestamp) + "\n";
-    }
-    // If not, don't send timestamp
-    else{
-      line += "\n";
-    }
     // Add measurement to the final body
     body += line;
   }
@@ -132,22 +112,8 @@ void InfluxDBWriter::update() {
     else {
       continue;
     }
-    
-    line = id;
 
-    // Get all the tags configured per sensor
-    sensor_tags = this->build_tags(id);
-    line += sensor_tags;
-
-    field = this->get_field_name(id);
-
-    //bool state = 
-    line += " " + field + "=" + std::to_string(state ? 1 : 0);
-    if (has_time) {
-      line += " " + std::to_string(timestamp) + "\n";
-    } else {
-      line += "\n";
-    }
+    line = this->build_line(id, state);
 
     body += line;
   }
@@ -168,26 +134,8 @@ void InfluxDBWriter::update() {
       continue;
     }
 
-    line = id;
+    line = this->build_line(id, value);
 
-    // Get all the tags configured per sensor
-    sensor_tags = this->build_tags(id);
-    line += sensor_tags;
-
-    // Checks if the sensor has a custom field name assigned
-    field = this->get_field_name(id);
-
-    // Adds the measurement value and the field name if a custom one is available
-    line += " " + field + "=\"" + value + "\"";
-
-    if (has_time == true) {
-      // Adds the timestamp at the end of the line
-      line += " " + to_string(timestamp) + "\n";
-    }
-    // If not, don't send timestamp
-    else{
-      line += "\n";
-    }
     // Add measurement to the final body
     body += line;
   }
@@ -230,6 +178,81 @@ std::string InfluxDBWriter::build_tags(const std::string& id) {
 std::string InfluxDBWriter::get_field_name(const std::string& id) {
   auto field_name = this->fieldNames_.find(id);
   return (field_name != this->fieldNames_.end()) ? field_name->second : "value";
+}
+
+// Method to prepare lines for sensors
+std::string InfluxDBWriter::build_line(const std::string &id, float &value) {
+    std::string line, sensor_tags, field;
+    // Start the line protocol with the id of the sensor
+    line = id;
+
+    // Get tags configured 
+    sensor_tags = this->build_tags(id);
+    line += sensor_tags;
+
+    // Checks if the sensor has a custom field name assigned
+    field = this->get_field_name(id);
+
+    // Adds the measurement value and the field name if a custom one is available
+    line += " " + field + "=" + to_string(value);
+
+    if (this->has_time == true) {
+      // Adds the timestamp at the end of the request
+      line += " " + to_string(timestamp) + "\n";
+    }
+    // If not, don't send timestamp
+    else{
+      line += "\n";
+    }
+    return line;
+}
+
+// Method to prepare lines for binary_sensors
+std::string InfluxDBWriter::build_line(const std::string &id, bool state) {
+  std::string line, sensor_tags, field;
+  line = id;
+
+  // Get all the tags configured per sensor
+  sensor_tags = this->build_tags(id);
+  line += sensor_tags;
+
+  field = this->get_field_name(id);
+
+  line += " " + field + "=" + std::to_string(state ? 1 : 0);
+  if (has_time) {
+    line += " " + std::to_string(timestamp) + "\n";
+  } else {
+    line += "\n";
+  }
+
+  return line;
+}
+
+// Method to prepare lines for text_sensors
+std::string InfluxDBWriter::build_line(const std::string &id, const std::string &value) {
+  std::string line, sensor_tags, field;
+  line = id;
+
+  // Get all the tags configured per sensor
+  sensor_tags = this->build_tags(id);
+  line += sensor_tags;
+
+  // Checks if the sensor has a custom field name assigned
+  field = this->get_field_name(id);
+
+  // Adds the measurement value and the field name if a custom one is available
+  line += " " + field + "=\"" + value + "\"";
+
+  if (has_time == true) {
+    // Adds the timestamp at the end of the line
+    line += " " + to_string(timestamp) + "\n";
+  }
+  // If not, don't send timestamp
+  else{
+    line += "\n";
+  }
+
+  return line;
 }
 
 void InfluxDBWriter::dump_config(){

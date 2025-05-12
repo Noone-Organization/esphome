@@ -42,10 +42,15 @@ class InfluxDBWriter : public PollingComponent {
       std::string port_;
       std::string timestampUnit_;
       std::string url_;
+      time_t timestamp;
+      bool has_time = false;
       bool use_ssl;
 
       std::string build_tags(const std::string& id);
       std::string get_field_name(const std::string& id);
+      std::string build_line(const std::string &id, float &value);
+      std::string build_line(const std::string &id, bool state);
+      std::string build_line(const std::string &id, const std::string &value);
 
       std::list<esphome::http_request::Header> headers_;
       
