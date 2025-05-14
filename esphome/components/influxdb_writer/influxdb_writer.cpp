@@ -10,7 +10,7 @@ static const char *const TAG = "influxdb_writer";
 void InfluxDBWriter::setup() {
   ESP_LOGI(TAG, "Setting up InfluxDBWriter");
 
-  if (this->use_ssl) this->url_ = "https://";
+  if (this->use_ssl_) this->url_ = "https://";
   else this->url_ = "http://";
 
   // Influxdb url
@@ -41,13 +41,18 @@ void InfluxDBWriter::setup() {
     }
   }
 
+  // If send_mac is configured, get it.
+  if (this->send_mac_) {
+    this->mac_addr_ = WiFi.macAddress().c_str();
+  }
+
   // Set Http headers
   this->headers_.push_back({"Content-Type", "text/plain;charset=utf-8"}); 
   // Authorization with API Token for InfluxDB v2
   this->headers_.push_back({"Authorization", "Token "+this->token_}); 
 }
 
-void InfluxDBWriter::update() {
+void InfluxDBWriter::publish_now() {
   static unsigned long last_sent = 0;
 
   // Variable to save individual measurements
@@ -57,6 +62,8 @@ void InfluxDBWriter::update() {
   std::string id;
   std::string field;
   std::string sensor_tags;
+
+  ESP_LOGD(TAG, "MAC Addr: %s", this->mac_addr_.c_str());
 
   // If sntp time is sinchronized, get one timestamp for the measurements
   if (this->time_ != nullptr) {
@@ -171,6 +178,9 @@ std::string InfluxDBWriter::build_tags(const std::string& id) {
         tags += "," + pair.first + "=" + pair.second;
       }
     }
+    if (this->send_mac_) {
+      tags += ",device=" + this->mac_addr_;
+    } 
     return tags;
 }
 
@@ -260,7 +270,6 @@ void InfluxDBWriter::dump_config(){
   ESP_LOGCONFIG(TAG, "Port: %s", this->port_.c_str());
   ESP_LOGCONFIG(TAG, "Organization: %s", this->org_.c_str());
   ESP_LOGCONFIG(TAG, "Bucket: %s", this->bucket_.c_str());
-  ESP_LOGCONFIG(TAG, "Update interval: %ds", this->update_interval_/1000);
 }
 
 }  // namespace influxdb_writer

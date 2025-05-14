@@ -18,10 +18,11 @@ CONF_TIMESTAMP_UNIT = "timestamp_unit"
 CONF_TAGS = "sensor_tags"
 CONF_FIELD_NAME = "field_names"
 CONF_USE_SSL = "use_ssl"
-CONF_SENSORS_NAMES_ID = "sensors_names_id"
+CONF_SENSORS_NAMES_ID = "sensors_names"
+CONF_SEND_MAC = "send_mac"
 
 influxdb_writer_ns = cg.esphome_ns.namespace("influxdb_writer")
-InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.PollingComponent)
+InfluxDBWriter = influxdb_writer_ns.class_("InfluxDBWriter", cg.Component)
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(InfluxDBWriter),
@@ -33,6 +34,7 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_ORG): cv.string,
     cv.Required(CONF_PORT): cv.string,
     cv.Required(CONF_SENSORS_NAMES_ID): cv.Schema({cv.string: cv.string}),
+    cv.Optional(CONF_SEND_MAC, default=True) : cv.boolean,
     cv.Optional(CONF_USE_SSL, default=True): cv.boolean,
     cv.Optional(CONF_TIMESTAMP_UNIT, default="s"): cv.one_of("s", "ms", lower=True),
     cv.Optional(CONF_FIELD_NAME, default={}): cv.Schema({
@@ -43,7 +45,7 @@ CONFIG_SCHEMA = cv.Schema({
             cv.string: cv.string
         })
     }),
-}).extend(cv.polling_component_schema("5min"))
+}).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
@@ -60,6 +62,7 @@ async def to_code(config):
     cg.add(var.set_http_request(request))
     cg.add(var.set_port(config[CONF_PORT]))
     cg.add(var.set_influxdb_timestamp_unit(config[CONF_TIMESTAMP_UNIT]))
+    cg.add(var.set_send_mac(config[CONF_SEND_MAC]))
     if CONF_TAGS in config:
         for sensor_id, tags in config[CONF_TAGS].items():
             for tag_key, tag_value in tags.items():

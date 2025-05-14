@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <WiFi.h>
 
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
@@ -14,11 +15,11 @@
 namespace esphome {
 namespace influxdb_writer {
 
-class InfluxDBWriter : public PollingComponent {
+class InfluxDBWriter : public Component {
    public:
-      InfluxDBWriter() : PollingComponent(){};  
+      InfluxDBWriter() : Component(){};  
       void setup() override;
-      void update() override;
+      void publish_now();
       void dump_config() override;
       
       void set_host(const std::string &host) { host_ = host; }
@@ -31,8 +32,9 @@ class InfluxDBWriter : public PollingComponent {
       void add_sensor_tag(const std::string &sensor, const std::string &tag, const std::string &value);
       void set_time(esphome::sntp::SNTPComponent *time) { this->time_ = time; }
       void set_field_name(const std::string &sensor, const std::string &fieldName);
-      void set_use_ssl(bool use_ssl) { this->use_ssl = use_ssl; }
+      void set_use_ssl(bool use_ssl) { this->use_ssl_ = use_ssl; }
       void add_sensor_name_id(const std::string &sensor_id, const std::string &name);
+      void set_send_mac(bool send_mac) { this->send_mac_ = send_mac; }
 
    protected:
       std::string host_;
@@ -42,9 +44,10 @@ class InfluxDBWriter : public PollingComponent {
       std::string port_;
       std::string timestampUnit_;
       std::string url_;
+      std::string mac_addr_;
       time_t timestamp;
       bool has_time = false;
-      bool use_ssl;
+      bool use_ssl_, send_mac_;
 
       std::string build_tags(const std::string& id);
       std::string get_field_name(const std::string& id);
