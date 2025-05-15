@@ -44,6 +44,7 @@ void InfluxDBWriter::setup() {
   // If send_mac is configured, get it.
   if (this->send_mac_) {
     this->mac_addr_ = WiFi.macAddress().c_str();
+    ESP_LOGV(TAG, "MAC Addr: %s", this->mac_addr_.c_str());
   }
 
   // Set Http headers
@@ -62,8 +63,6 @@ void InfluxDBWriter::publish_now() {
   std::string id;
   std::string field;
   std::string sensor_tags;
-
-  ESP_LOGD(TAG, "MAC Addr: %s", this->mac_addr_.c_str());
 
   // If sntp time is sinchronized, get one timestamp for the measurements
   if (this->time_ != nullptr) {
@@ -99,6 +98,7 @@ void InfluxDBWriter::publish_now() {
       continue;
     }
 
+    // Prepare measurement with line protocol
     line = build_line(id, value);
 
     // Add measurement to the final body
@@ -120,6 +120,7 @@ void InfluxDBWriter::publish_now() {
       continue;
     }
 
+    // Prepare measurement with line protocol
     line = this->build_line(id, state);
 
     body += line;
@@ -141,13 +142,14 @@ void InfluxDBWriter::publish_now() {
       continue;
     }
 
+    // Prepare measurement with line protocol
     line = this->build_line(id, value);
 
     // Add measurement to the final body
     body += line;
   }
 
-  ESP_LOGD(TAG, "HTTP Request Body: %s", body.c_str());
+  ESP_LOGV(TAG, "HTTP Request Body: %s", body.c_str());
 
   // Http POST request
   auto return_code = this->http_request_->post(this->url_, body, this->headers_);
