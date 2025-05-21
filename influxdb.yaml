@@ -1,0 +1,66 @@
+esphome:
+  name: influxdb-writer
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: "Cipolatti"
+  password: "38136350"
+  manual_ip:
+    static_ip: 192.168.1.50
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Influxdb-Writer Fallback Hotspot"
+    password: "E61qJH92LTrc"
+
+captive_portal:
+
+sensor:
+  - platform: dht
+    model: DHT11
+    pin: GPIO4
+    temperature:
+      name: "temperature"
+    humidity:
+      name: "humidity"
+    update_interval: 20s
+
+http_request:
+  id: http_client
+  verify_ssl: false
+  
+influxdb_writer:
+  id: writer
+  host: "192.168.1.14"
+  port: "8086"
+  token: "TeleAuUi9M9hiQXCouzLvRIUFEW6PqHraoba51ivt7ux0Ve11QMk7ti9nlJafkOmZiUhzH_Jl484xhAJN1ExYw=="
+  bucket: "TestBucket"
+  org: "Noone"
+  precision: "s"
+  http_request_id: http_client
+  update_interval: 60s
+  sensor_tags:
+    temperature: 
+      room: "Living"
+      city: "Sunchales"
+    humidity:
+      room: "Kitchen"
+
